@@ -1,0 +1,10 @@
+{
+  "name": "deploy-kit",
+  "description": "Next.js só com Docker, proxy nginx + Cloudflare Tunnel, deploy com runner self-hosted e formulários com Server Action.",
+  "version": "1.0.0",
+  "author": { "name": "Engenharia Inversa", "url": "https://github.com/engenhariainversa" },
+  "homepage": "https://github.com/engenhariainversa/skills",
+  "repository": "https://github.com/engenhariainversa/skills",
+  "license": "MIT",
+  "keywords": ["nextjs", "docker", "nginx", "cloudflare", "github-actions", "deploy"]
+}

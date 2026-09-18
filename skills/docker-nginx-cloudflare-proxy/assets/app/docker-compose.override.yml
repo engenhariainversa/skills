@@ -1,0 +1,11 @@
+# Producao atras do nginx do proxy: o app entra na rede "proxy" e nao publica portas.
+# O servico "dev" nao e afetado (continua em localhost).
+# Se este repo for usado em outros ambientes sem o proxy, nao versione este arquivo.
+services:
+  app:
+    container_name: <app>-app
+    ports: !reset []
+    networks: [default, proxy]
+networks:
+  proxy:
+    external: true

@@ -1,0 +1,16 @@
+{
+  "name": "engenhariainversa",
+  "owner": { "name": "Engenharia Inversa", "url": "https://github.com/engenhariainversa" },
+  "metadata": {
+    "description": "Skills da Engenharia Inversa para subir projetos do zero ao ar no próprio servidor."
+  },
+  "plugins": [
+    {
+      "name": "deploy-kit",
+      "source": "./",
+      "description": "Next.js só com Docker, proxy nginx + Cloudflare Tunnel, deploy com runner self-hosted e formulários com Server Action.",
+      "version": "1.0.0",
+      "category": "devops"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+# Cloudflare Tunnel: alternativa a port forward/DMZ. TLS fica na borda da Cloudflare.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+# Zero Trust -> Networks -> Tunnels -> Create tunnel (Cloudflared) -> copie o token para ./tunnel.env:
+#   TUNNEL_TOKEN=eyJ...
+# Depois, em Public Hostnames do tunel: <dominio> -> HTTP -> proxy-nginx:80
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: proxy-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file: ./tunnel.env
+    networks: [proxy]

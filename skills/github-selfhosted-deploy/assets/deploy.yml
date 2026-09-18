@@ -1,0 +1,47 @@
+name: Deploy (self-hosted)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, <label>]
+    timeout-minutes: 30
+    env:
+      DEPLOY_DIR: /caminho/para/<app>
+    steps:
+      - name: Atualizar codigo no diretorio de producao
+        run: |
+          cd "$DEPLOY_DIR"
+          git fetch "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" main
+          git checkout -q main
+          git merge --ff-only FETCH_HEAD
+          git log --oneline -1
+
+      - name: Build e subir containers
+        run: |
+          cd "$DEPLOY_DIR"
+          export GIT_SHA=$(git rev-parse --short HEAD)
+          export BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          docker compose --profile prod up -d --build --remove-orphans
+
+      - name: Health check
+        run: |
+          cd "$DEPLOY_DIR"
+          for i in $(seq 1 30); do
+            if docker compose exec -T app node -e "fetch('http://localhost:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"; then
+              echo "app respondendo"; exit 0
+            fi
+            sleep 2
+          done
+          echo "app nao respondeu em 60s"; docker compose logs --tail=50 app; exit 1
+
+      - name: Limpar imagens antigas
+        if: success()
+        run: docker image prune -f

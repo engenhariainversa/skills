@@ -1,0 +1,33 @@
+# Proxy reverso de producao: nginx em :80/:443 (+ certbot opcional para o modo Let's Encrypt).
+# As aplicacoes entram na rede externa "proxy" e NAO publicam portas; o nginx fala com elas pelo nome do container.
+# Criar a rede uma vez: docker network create proxy
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: proxy-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    networks: [proxy]
+    # recarrega a config a cada 6h para pegar certificados renovados
+    command: /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+
+  certbot:
+    image: certbot/certbot
+    container_name: proxy-certbot
+    restart: unless-stopped
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    # tenta renovar a cada 12h (so renova quando faltam <30 dias). Inofensivo se nao houver certificados.
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+
+networks:
+  proxy:
+    external: true

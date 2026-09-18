@@ -1,0 +1,39 @@
+services:
+  # Desenvolvimento com hot reload: docker compose --profile dev up --build
+  dev:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "127.0.0.1:3001:3000"   # troque a porta se 3001 já estiver em uso no host
+    environment:
+      TZ: America/Sao_Paulo
+      DATA_DIR: /app/data
+    volumes:
+      - .:/app
+      # node_modules e .next ficam em volumes nomeados pra não misturar com o host
+      - dev_node_modules:/app/node_modules
+      - dev_next:/app/.next
+    profiles: ["dev"]
+
+  # Produção: docker compose --profile prod up -d --build
+  app:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+        BUILD_TIME: ${BUILD_TIME:-}
+    restart: unless-stopped
+    environment:
+      TZ: America/Sao_Paulo
+    ports:
+      - "3000:3000"   # removido pelo docker-compose.override.yml quando há proxy (ver skill docker-nginx-cloudflare-proxy)
+    volumes:
+      # dados gravados pelo app; volume nomeado, sobrevive ao deploy
+      - data:/data
+    profiles: ["prod"]
+
+volumes:
+  dev_node_modules:
+  dev_next:
+  data:
