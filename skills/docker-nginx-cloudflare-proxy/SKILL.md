@@ -70,12 +70,10 @@ Um 200 aqui prova que nginx → app funciona, independente de DNS.
 
 ### 4. Domínio na Cloudflare
 
-Isso é feito no painel, não dá para automatizar sem API token:
-
 1. A zona do domínio precisa estar na Cloudflare. Verifique com `dig +short NS <dominio>`: se aparecer `domaincontrol.com` (GoDaddy), `registro.br` etc., o usuário precisa adicionar o site na Cloudflare e trocar os nameservers no registrador. Um CNAME para `*.cfargotunnel.com` a partir de outro DNS **não** funciona.
-2. Zero Trust → Tunnels → o túnel → *Public Hostname* → `<dominio>` (e outro para `www`) → tipo **HTTP** → URL `proxy-nginx:80`. A Cloudflare cria o registro DNS sozinha.
+2. Hostname no ingress do túnel (→ `proxy-nginx:80`) e CNAME proxied na zona. Dá para fazer pela CLI com `cloudflared` — é a skill **`cloudflare-tunnel-hostnames`** (inclui login por zona, Access com allowlist e validação). Pelo painel: Zero Trust → Tunnels → o túnel → *Public Hostname* → `<dominio>` → tipo **HTTP** → URL `proxy-nginx:80`; a Cloudflare cria o registro DNS sozinha.
 
-Avise o usuário exatamente desses dois passos quando o DNS ainda não estiver na Cloudflare.
+Avise o usuário do passo 1 quando o DNS ainda não estiver na Cloudflare.
 
 ## Operação
 

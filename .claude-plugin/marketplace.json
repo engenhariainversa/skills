@@ -11,8 +11,8 @@
     {
       "name": "deploy-kit",
       "source": "./",
-      "description": "Next.js só com Docker, monorepo pnpm+Turborepo, proxy nginx + Cloudflare Tunnel, deploy com runner self-hosted e formulários com Server Action.",
-      "version": "1.1.0",
+      "description": "Next.js só com Docker, monorepo pnpm+Turborepo, proxy nginx + Cloudflare Tunnel, hostnames/Access no túnel pela CLI, deploy com runner self-hosted e formulários com Server Action.",
+      "version": "1.2.0",
       "category": "devops"
     }
   ]

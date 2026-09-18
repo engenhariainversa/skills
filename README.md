@@ -6,6 +6,7 @@ Skills do [Claude Code](https://code.claude.com) que capturam, passo a passo, co
 |---|---|
 | [`nextjs-docker-bootstrap`](skills/nextjs-docker-bootstrap/SKILL.md) | Cria e roda um Next.js (App Router, TS, Tailwind, pnpm) **sem instalar Node na máquina**. Dockerfile multi-stage, compose com profiles `dev` (hot reload) e `prod` (standalone). |
 | [`docker-nginx-cloudflare-proxy`](skills/docker-nginx-cloudflare-proxy/SKILL.md) | Um nginx como proxy reverso por domínio e Cloudflare Tunnel na entrada, sem abrir portas no roteador. Criação do proxy e inclusão de novos apps. |
+| [`cloudflare-tunnel-hostnames`](skills/cloudflare-tunnel-hostnames/SKILL.md) | Hostname novo num túnel existente **pela CLI**: login do `cloudflared` na zona certa, ingress, CNAME via `tunnel route dns`, Access com allowlist de e-mails e validação de fora. |
 | [`github-selfhosted-deploy`](skills/github-selfhosted-deploy/SKILL.md) | Push na `main` → runner self-hosted no servidor → `docker compose --profile prod up -d --build` → health check. Inclui registro do runner. |
 | [`monorepo-setup`](skills/monorepo-setup/SKILL.md) | Monorepo pnpm workspaces + Turborepo (`apps/` + `packages/`): Next.js + NestJS + Prisma compartilhados, um Dockerfile multi-target, compose dev/prod e deploy com secrets. Inclui checklist para adicionar app/package. |
 | [`nextjs-server-action-form`](skills/nextjs-server-action-form/SKILL.md) | Formulário com Server Action + `useActionState`, validação por campo, honeypot, persistência em JSON e teste por `curl`. |
