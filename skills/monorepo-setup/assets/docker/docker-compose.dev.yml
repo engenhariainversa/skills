@@ -1,0 +1,92 @@
+services:
+  # ── PostgreSQL Database ─────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: <projeto>
+      POSTGRES_PASSWORD: <projeto>_dev
+      POSTGRES_DB: <projeto>
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U <projeto> -d <projeto>"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (NestJS — dev with hot-reload) ──────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: sh -c "pnpm --filter @repo/database build && pnpm --filter @repo/database db:migrate:deploy && pnpm --filter @repo/database db:seed && pnpm --filter backend dev"
+    ports:
+      - "4050:4050"
+    environment:
+      - NODE_ENV=development
+      - PORT=4050
+      - DATABASE_URL=postgresql://<projeto>:<projeto>_dev@db:5432/<projeto>
+      - JWT_SECRET=dev-secret-change-in-production
+      # Must match the volume mount below (see docker-compose.yml).
+      - UPLOADS_DIR=/app/apps/backend/uploads
+    volumes:
+      - ./apps/backend/src:/app/apps/backend/src
+      - ./packages/database:/app/packages/database
+      - uploads:/app/apps/backend/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const s = require('net').createConnection(4050, 'localhost'); s.on('connect', () => { s.destroy(); process.exit(0); }); s.on('error', () => process.exit(1));\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ── CMS (Next.js — dev with hot-reload) ─────────────────
+  cms:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: pnpm --filter cms dev
+    ports:
+      - "4051:4051"
+    environment:
+      - NODE_ENV=development
+      - PORT=4051
+      - NEXT_PUBLIC_API_URL=http://localhost:4050
+      - NEXT_PUBLIC_GRAPHQL_PATH=/graphql
+    volumes:
+      - ./apps/cms/app:/app/apps/cms/app
+      - ./apps/cms/components:/app/apps/cms/components
+      - ./packages/ui/src:/app/packages/ui/src
+      - ./packages/graphql/src:/app/packages/graphql/src
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ── Landing Page (Next.js — dev with hot-reload) ────────
+  landing:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: pnpm --filter landing dev
+    ports:
+      - "4052:4052"
+    environment:
+      - NODE_ENV=development
+      - PORT=4052
+      - NEXT_PUBLIC_API_URL=http://localhost:4050
+      - NEXT_PUBLIC_GRAPHQL_PATH=/graphql
+    volumes:
+      - ./apps/landing/app:/app/apps/landing/app
+      - ./apps/landing/components:/app/apps/landing/components
+      - ./apps/landing/public:/app/apps/landing/public
+      - ./packages/ui/src:/app/packages/ui/src
+      - ./packages/graphql/src:/app/packages/graphql/src
+
+volumes:
+  pgdata:
+  uploads:

@@ -1,0 +1,76 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write .env from secrets to stable system path
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_GRAPHQL_PATH: ${{ secrets.NEXT_PUBLIC_GRAPHQL_PATH }}
+        run: |
+          mkdir -p /opt/<projeto>
+          {
+            printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
+            printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+            printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
+            printf 'NEXT_PUBLIC_API_URL=%s\n' "$NEXT_PUBLIC_API_URL"
+            printf 'NEXT_PUBLIC_GRAPHQL_PATH=%s\n' "$NEXT_PUBLIC_GRAPHQL_PATH"
+          } > /opt/<projeto>/.env
+          chmod 600 /opt/<projeto>/.env
+
+      - name: Build and start services
+        run: docker compose --env-file /opt/<projeto>/.env -f docker-compose.yml up --build -d --remove-orphans
+
+      - name: Wait for backend to be healthy
+        run: |
+          cid=$(docker compose --env-file /opt/<projeto>/.env -f docker-compose.yml ps -q backend)
+          if [ -z "$cid" ]; then
+            echo "backend container not found"
+            exit 1
+          fi
+          for i in $(seq 1 60); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' "$cid")
+            echo "attempt $i: backend health = $status"
+            if [ "$status" = "healthy" ]; then
+              break
+            fi
+            if [ "$i" = "60" ]; then
+              echo "backend failed to become healthy within 5 minutes"
+              docker compose --env-file /opt/<projeto>/.env -f docker-compose.yml logs --tail=200 backend
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Verify DB schema matches schema.prisma (drift check)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cid=$(docker compose --env-file /opt/<projeto>/.env -f docker-compose.yml ps -q backend)
+          docker exec -e DATABASE_URL="$DATABASE_URL" "$cid" \
+            pnpm --filter @repo/database db:migrate:check
+
+      - name: Prune dangling images
+        if: always()
+        run: docker image prune -f

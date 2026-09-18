@@ -1,0 +1,90 @@
+services:
+  # ── PostgreSQL Database ─────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Backend (NestJS + GraphQL) ──────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    ports:
+      - "4050:4050"
+    environment:
+      - NODE_ENV=production
+      - PORT=4050
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL is required}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - CORS_ORIGINS=https://cms.<dominio>,https://<dominio>,https://www.<dominio>
+      # Must match the volume mount below. The production image runs from /app,
+      # so without this the server would write uploads to /app/uploads — the
+      # container's writable layer, wiped on every redeploy.
+      - UPLOADS_DIR=/app/apps/backend/uploads
+    volumes:
+      - uploads:/app/apps/backend/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const s = require('net').createConnection(4050, 'localhost'); s.on('connect', () => { s.destroy(); process.exit(0); }); s.on('error', () => process.exit(1));\""]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── CMS (Next.js) ──────────────────────────────────────
+  cms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cms
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        - NEXT_PUBLIC_GRAPHQL_PATH=${NEXT_PUBLIC_GRAPHQL_PATH:?NEXT_PUBLIC_GRAPHQL_PATH is required}
+    ports:
+      - "4051:4051"
+    environment:
+      - NODE_ENV=production
+      - PORT=4051
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+      - NEXT_PUBLIC_GRAPHQL_PATH=${NEXT_PUBLIC_GRAPHQL_PATH:?NEXT_PUBLIC_GRAPHQL_PATH is required}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Landing Page (Next.js) ──────────────────────────────
+  landing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: landing
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        - NEXT_PUBLIC_GRAPHQL_PATH=${NEXT_PUBLIC_GRAPHQL_PATH:?NEXT_PUBLIC_GRAPHQL_PATH is required}
+    ports:
+      - "4052:4052"
+    environment:
+      - NODE_ENV=production
+      - PORT=4052
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+      - NEXT_PUBLIC_GRAPHQL_PATH=${NEXT_PUBLIC_GRAPHQL_PATH:?NEXT_PUBLIC_GRAPHQL_PATH is required}
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

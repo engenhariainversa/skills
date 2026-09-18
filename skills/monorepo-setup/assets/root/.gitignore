@@ -1,0 +1,10 @@
+node_modules
+.next
+dist
+.turbo
+build
+*.tsbuildinfo
+.env
+*.db
+*.db-journal
+uploads/
