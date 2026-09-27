@@ -1,0 +1,10 @@
+# Postgres com pgvector E PostGIS no mesmo servidor (projeto novo, sem volume legado).
+# Base: pgvector/pgvector (Debian, Postgres oficial + pgvector já compilado). O repositório apt do
+# PGDG já vem configurado na imagem oficial, então o PostGIS da mesma major entra por apt.
+# As extensões são criadas pela migration (CREATE EXTENSION), não aqui.
+ARG PG_MAJOR=17
+FROM pgvector/pgvector:pg${PG_MAJOR}
+ARG PG_MAJOR
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends "postgresql-${PG_MAJOR}-postgis-3" \
+ && rm -rf /var/lib/apt/lists/*

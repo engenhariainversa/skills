@@ -32,3 +32,33 @@ pnpm --filter <app> build                      # dentro do container de dev
 docker compose build <app>                     # target de produção compila
 docker compose config | grep -A5 "^  <app>:"   # portas/args corretos
 ```
+
+## App mobile (`apps/mobile`, Expo / React Native)
+
+O app nativo vive no monorepo para dividir contrato, tipos e queries com o backend, mas **não roda em Docker nem entra em imagem**: o build é no EAS e o dev é Metro + development build. Scaffold, arquitetura e build: skill `react-native-mobile-app`. Aqui fica só o que muda no monorepo.
+
+1. Copie o template da skill para `apps/mobile/` (`"name": "mobile"`) e, se a API for REST, `packages/api-contract/` (`@repo/api-contract`, zod compilado para `dist/`, usado pelo backend para validar e pelo app para decodificar). Se for GraphQL, o app consome `@repo/graphql` (veja `references/graphql-client.md` da skill mobile).
+2. **Uma versão de React no repo inteiro**: o React Native fixa a versão exata e o Next dos outros apps precisa seguir. No `package.json` da raiz:
+   ```json
+   "pnpm": { "overrides": { "react": "19.2.3", "react-dom": "19.2.3", "@types/react": "~19.2.2" } }
+   ```
+   Upgrade de SDK do Expo = subir essas versões e testar landing/cms junto.
+3. **Dockerfile** (stage `deps`): copie o `package.json` do mobile para o lockfile bater e exclua o workspace do install:
+   ```dockerfile
+   COPY apps/mobile/package.json ./apps/mobile/package.json
+   RUN pnpm install --frozen-lockfile --filter "!mobile"
+   ```
+   Mesmo ajuste no `Dockerfile.dev`. Sem o filtro, a imagem baixa o React Native inteiro (centenas de MB) à toa.
+4. **`.dockerignore`**: `apps/mobile/*` seguido de `!apps/mobile/package.json`, para o stage `source` (`COPY . .`) não carregar assets e `node_modules` do app.
+5. **Compose e nginx**: nada. O app fala com a API pública (`https://api.<dominio>`); lembre que rota atrás de Cloudflare Access é inalcançável pelo app, e que o backend pode querer checar o header `X-App-Version`.
+6. **Turborepo**: os scripts `typecheck`, `test`, `lint` do mobile entram no `turbo run` normalmente; não defina `build` no mobile (o "build" é o EAS). Se `@repo/api-contract` é compilado, `turbo run typecheck` precisa de `dependsOn: ["^build"]` na task.
+7. **Metro**: `expo/metro-config` acha a raiz do workspace sozinho. Se aparecer "Unable to resolve module" ou duas cópias de `react`, use `node-linker=hoisted` no `.npmrc` da raiz (afeta o repo todo; rode `pnpm install` de novo e revalide os builds Docker).
+8. **CI**: typecheck e testes do mobile rodam no job de check (container `node:22`), não no deploy. O deploy do servidor continua sem saber que o app existe.
+
+Verificação rápida:
+
+```bash
+pnpm install && pnpm --filter @repo/api-contract build
+pnpm --filter mobile typecheck && pnpm --filter mobile test
+docker compose build backend        # imagem continua sem react-native
+```

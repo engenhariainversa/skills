@@ -1,0 +1,16 @@
+// Trecho para packages/database/prisma/schema.prisma.
+// `embedding` é Unsupported: o Prisma Client não lê nem escreve essa coluna. Toda leitura/escrita
+// dela passa por $queryRaw/$executeRaw (assets/src/vector-repository.ts). O resto do model continua
+// usável pelo client normal (findMany, updateMany, count...).
+
+model <Modelo> {
+  id          String                      @id
+  name        String
+  description String
+  embedding   Unsupported("vector(384)")?
+  embedModel  String?                     @map("embed_model")
+  createdAt   DateTime                    @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("<tabela>")
+}

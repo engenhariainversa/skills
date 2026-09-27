@@ -1,0 +1,26 @@
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Projetos nativos são gerados pelo EAS Build (prebuild); nunca commitados
+/ios
+/android
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Metro
+.metro-health-check*
+
+# env local (o .env.example é commitado)
+.env
+.env*.local
+
+*.tsbuildinfo

@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "<Nome do App>",
+    "slug": "<slug>",
+    "owner": "<conta-expo>",
+    "scheme": "<scheme>",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0B0F19",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "<com.dominio.app>",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "<com.dominio.app>",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0F19",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "permissions": []
+    },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#0B0F19", "imageWidth": 160 }
+      ],
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

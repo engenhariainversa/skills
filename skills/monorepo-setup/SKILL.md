@@ -1,6 +1,6 @@
 ---
 name: monorepo-setup
-description: Monta ou estende um monorepo TypeScript com pnpm workspaces + Turborepo no padrão apps/ + packages/ (Next.js para landing e CMS, NestJS para backend, Prisma em @repo/database, tsconfig e eslint compartilhados), com um único Dockerfile multi-target, compose de dev com hot reload e compose de produção, e deploy por runner self-hosted com secrets do GitHub. Use sempre que o usuário falar em "monorepo", "workspaces", "turborepo", "apps e packages compartilhados", "landing + cms + api no mesmo repo", "adicionar um app/package ao monorepo" ou quando dois ou mais apps precisam dividir tipos, banco ou componentes.
+description: Monta ou estende um monorepo TypeScript com pnpm workspaces + Turborepo no padrão apps/ + packages/ (Next.js para landing e CMS, NestJS para backend, Prisma em @repo/database, tsconfig e eslint compartilhados), com um único Dockerfile multi-target, compose de dev com hot reload e compose de produção, e deploy por runner self-hosted com secrets do GitHub. Use sempre que o usuário falar em "monorepo", "workspaces", "turborepo", "apps e packages compartilhados", "landing + cms + api no mesmo repo", "adicionar um app/package ao monorepo", "colocar o app mobile/Expo no monorepo (apps/mobile)" ou quando dois ou mais apps precisam dividir tipos, banco ou componentes.
 ---
 
 # Monorepo pnpm + Turborepo, tudo em Docker
@@ -14,7 +14,8 @@ Referência viva: `github.com/engenhariainversa/platform-monorepo` (landing + CM
 ├── apps/
 │   ├── landing/        Next.js (site público)             porta 4052
 │   ├── cms/            Next.js (painel)                   porta 4051
-│   └── backend/        NestJS + GraphQL code-first        porta 4050
+│   ├── backend/        NestJS + GraphQL code-first        porta 4050
+│   └── mobile/         Expo/React Native (opcional)       fora do Docker, build no EAS
 ├── packages/
 │   ├── database/       Prisma: schema, migrations, client (@repo/database)
 │   ├── graphql/        client Apollo + queries + tipos    (@repo/graphql)
@@ -85,6 +86,8 @@ Secrets necessários no repo: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB
 ## Adicionar um app ou package
 
 Checklist em `references/add-app-or-package.md`. O resumo: `package.json` com nome e `workspace:*`, `tsconfig.json` estendendo o compartilhado, `transpilePackages` se for Next, linha no stage `deps` do Dockerfile, stages `<app>-build` e `<app>`, serviço nos dois composes com porta nova, conf no nginx se for público. Rode `pnpm install` dentro do container de dev para atualizar o lockfile.
+
+**App mobile (`apps/mobile`, Expo)** é o caso diferente: não vira stage nem serviço de compose, só entra no stage `deps` para o lockfile bater e fica fora do install da imagem (`--filter "!mobile"`); o React da raiz é fixado por `pnpm.overrides` porque o React Native exige versão exata. Seção própria no checklist; o app em si vem da skill `react-native-mobile-app`.
 
 ## CLAUDE.md do monorepo
 

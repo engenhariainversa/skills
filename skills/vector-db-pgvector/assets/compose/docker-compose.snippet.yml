@@ -1,0 +1,47 @@
+# Trechos para colar no compose do projeto (dev e prod). Ajuste <projeto> e o caminho do build.
+# O serviço de API (backend) recebe EMBED_URL/EMBED_SECRET; nada de porta publicada para o embed.
+
+services:
+  db:
+    # postgres + pgvector (assets/db/Dockerfile) ou + PostGIS (Dockerfile.postgis):
+    #   build: { context: docker/db, dockerfile: Dockerfile.postgis }
+    build: docker/db
+    image: <projeto>-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-<projeto>}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-<projeto>_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-<projeto>}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Embeddings de texto (docker/embed): fastembed em CPU. O app funciona sem ele (a feature que
+  # depende de similaridade só fica desligada). Pesos (~500 MB) no volume embed-models no 1º start;
+  # o healthcheck tem start_period de 180 s por isso.
+  embed:
+    build: docker/embed
+    image: <projeto>-embed
+    restart: unless-stopped
+    environment:
+      # Vazio = recusa toda request. Gere com: openssl rand -base64 32
+      EMBED_SECRET: ${EMBED_SECRET:-}
+      # EMBED_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      # EMBED_THREADS: "0"   # 0 = padrão do onnxruntime
+    volumes:
+      - embed-models:/models
+
+  backend:
+    # ...o resto do serviço como já está no projeto...
+    environment:
+      EMBED_URL: ${EMBED_URL:-http://embed:8000}
+      EMBED_SECRET: ${EMBED_SECRET:-}
+      # SIMILARITY_THRESHOLD: "0.92"   # calibre com dados reais (references/similarity-and-dedup.md)
+
+volumes:
+  pgdata:
+  embed-models:

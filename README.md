@@ -10,6 +10,8 @@ Skills do [Claude Code](https://code.claude.com) que capturam, passo a passo, co
 | [`github-selfhosted-deploy`](skills/github-selfhosted-deploy/SKILL.md) | Push na `main` → runner self-hosted no servidor → `docker compose --profile prod up -d --build` → health check. Inclui registro do runner. |
 | [`monorepo-setup`](skills/monorepo-setup/SKILL.md) | Monorepo pnpm workspaces + Turborepo (`apps/` + `packages/`): Next.js + NestJS + Prisma compartilhados, um Dockerfile multi-target, compose dev/prod e deploy com secrets. Inclui checklist para adicionar app/package. |
 | [`nextjs-server-action-form`](skills/nextjs-server-action-form/SKILL.md) | Formulário com Server Action + `useActionState`, validação por campo, honeypot, persistência em JSON e teste por `curl`. |
+| [`vector-db-pgvector`](skills/vector-db-pgvector/SKILL.md) | Busca por similaridade no próprio Postgres: imagem com pgvector (e variante com PostGIS), serviço de embeddings local (fastembed, CPU, 384 dim), Prisma com `Unsupported` + SQL cru, k-NN por cosseno, sweeper, calibração de limiar e dedup de conteúdo gerado por agente. |
+| [`react-native-mobile-app`](skills/react-native-mobile-app/SKILL.md) | App Expo (SDK 57, RN 0.86) com expo-router e NativeWind em `apps/mobile`: MVVM com zustand, MMKV + SecureStore, client de API com modo mock e contrato zod compartilhado, Jest em dois projetos e build no EAS. |
 
 ## Instalar
 
@@ -43,6 +45,8 @@ Só para um projeto: os mesmos links em `.claude/skills/` dentro do repositório
 3. `docker-nginx-cloudflare-proxy`: app na rede `proxy`, conf do nginx, hostname no túnel.
 4. `github-selfhosted-deploy`: workflow + runner; a partir daí, push publica.
 
+Opcionais: `vector-db-pgvector` quando o backend precisa de similaridade semântica (memória de agente, dedup); `react-native-mobile-app` quando há app nativo consumindo a API.
+
 Cada skill lista o que fica a cargo de quem opera (painel da Cloudflare, `sudo` para o runner) para o Claude não tentar contornar permissões.
 
 ## Estrutura
@@ -51,8 +55,8 @@ Cada skill lista o que fica a cargo de quem opera (painel da Cloudflare, `sudo` 
 .claude-plugin/        plugin.json + marketplace.json (instalação via /plugin)
 skills/<nome>/
   SKILL.md             instruções (frontmatter name + description define quando a skill dispara)
-  assets/              templates prontos para copiar (Dockerfile, compose, nginx, workflow)
-  references/          material lido sob demanda (runner, Let's Encrypt, testes com curl)
+  assets/              templates prontos para copiar (Dockerfile, compose, nginx, workflow, app Expo)
+  references/          material lido sob demanda (runner, Let's Encrypt, rollout do pgvector, EAS)
 ```
 
 ## Contribuir
