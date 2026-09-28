@@ -11,7 +11,7 @@ Skills do [Claude Code](https://code.claude.com) que capturam, passo a passo, co
 | [`monorepo-setup`](skills/monorepo-setup/SKILL.md) | Monorepo pnpm workspaces + Turborepo (`apps/` + `packages/`): Next.js + NestJS + Prisma compartilhados, um Dockerfile multi-target, compose dev/prod e deploy com secrets. Inclui checklist para adicionar app/package. |
 | [`nextjs-server-action-form`](skills/nextjs-server-action-form/SKILL.md) | Formulário com Server Action + `useActionState`, validação por campo, honeypot, persistência em JSON e teste por `curl`. |
 | [`vector-db-pgvector`](skills/vector-db-pgvector/SKILL.md) | Busca por similaridade no próprio Postgres: imagem com pgvector (e variante com PostGIS), serviço de embeddings local (fastembed, CPU, 384 dim), Prisma com `Unsupported` + SQL cru, k-NN por cosseno, sweeper, calibração de limiar e dedup de conteúdo gerado por agente. |
-| [`react-native-mobile-app`](skills/react-native-mobile-app/SKILL.md) | App Expo (SDK 57, RN 0.86) com expo-router e NativeWind em `apps/mobile`: MVVM com zustand, MMKV + SecureStore, client de API com modo mock e contrato zod compartilhado, Jest em dois projetos e build no EAS. |
+| [`react-native-mobile-app`](skills/react-native-mobile-app/SKILL.md) | App Expo (SDK 57, RN 0.86) com expo-router em `apps/mobile`: layout só com NativeWind/Tailwind (tokens claro/escuro), estado só em zustand com MMKV + SecureStore, client de API com modo mock e contrato zod compartilhado, Jest em dois projetos e build no EAS. |
 
 ## Instalar
 

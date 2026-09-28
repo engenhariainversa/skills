@@ -1,6 +1,6 @@
 ---
 name: react-native-mobile-app
-description: Cria um app mobile React Native com Expo (SDK 57, React Native 0.86, React 19.2) e expo-router, em TypeScript, dentro de um monorepo pnpm/Turborepo como apps/mobile - development build via EAS (sem Expo Go), NativeWind v4 com tema claro/escuro por variáveis CSS, arquitetura MVVM por feature com zustand, MMKV para estado persistido e SecureStore para tokens, client de API com transporte trocável (http real ou mock em memória), contrato zod compartilhado com o backend, login com refresh token e renovação single-flight, Jest em dois projetos (lógica em Node puro + telas com jest-expo). Use sempre que o usuário falar em "app mobile", "app React Native", "Expo", "app iOS/Android", "EAS build", "expo-router", "adicionar apps/mobile ao monorepo", "jogo mobile", ou quiser um app nativo consumindo a API (REST ou GraphQL) do backend NestJS.
+description: Cria um app mobile React Native com Expo (SDK 57, React Native 0.86, React 19.2) e expo-router, em TypeScript, dentro de um monorepo pnpm/Turborepo como apps/mobile - development build via EAS (sem Expo Go), NativeWind v4 com tema claro/escuro por variáveis CSS, arquitetura MVVM por feature com zustand, MMKV para estado persistido e SecureStore para tokens, client de API com transporte trocável (http real ou mock em memória), contrato zod compartilhado com o backend, login com refresh token e renovação single-flight, Jest em dois projetos (lógica em Node puro + telas com jest-expo). Use sempre que o usuário falar em "app mobile", "app React Native", "Expo", "app iOS/Android", "EAS build", "expo-router", "adicionar apps/mobile ao monorepo", "jogo mobile", "estilizar/criar tela no app", "tema claro/escuro no app", "persistir preferência no app", ou quiser um app nativo consumindo a API (REST ou GraphQL) do backend NestJS.
 ---
 
 # App React Native (Expo) no monorepo
@@ -14,9 +14,9 @@ Referência viva: o app mobile do termhub (chat com streaming, notificações, s
 | Framework | Expo SDK 57 (`expo ~57.0`), RN 0.86.3, React 19.2.3 | Build nativo na nuvem (EAS), módulos Expo mantidos, upgrades de SDK guiados |
 | Execução | **Development build** (`expo-dev-client`), nunca Expo Go | Qualquer módulo nativo (MMKV, crypto, mapas) quebra no Expo Go |
 | Navegação | `expo-router` (rotas por arquivo, `typedRoutes`) | Deep link de graça (`<scheme>://rota/<id>`), layouts aninhados |
-| Estilo | NativeWind v4 + Tailwind 3, cores em variáveis CSS | `bg-app-bg` troca claro/escuro sem `dark:` em toda tela |
-| Estado | zustand (factory `createXStore(deps)` + singleton) | Store testável em Node puro com deps falsas |
-| Persistência | MMKV (estado) + SecureStore (segredos) | MMKV é síncrono e rápido; token só no Keychain/Keystore |
+| Estilo | **NativeWind v4 + Tailwind 3** (padrão de todo layout), cores em variáveis CSS | `bg-app-bg` troca claro/escuro sem `dark:` em toda tela |
+| Estado | **zustand** (factory `createXStore(deps)` + singleton), único gerenciador | Store testável em Node puro com deps falsas |
+| Persistência | **MMKV** (estado, via `persist`) + SecureStore (segredos) | MMKV é síncrono e rápido; token só no Keychain/Keystore |
 | API | client sobre `Transport` (`FetchTransport` ou mock) + zod | App roda sem backend; resposta fora do contrato vira erro tratável |
 | Testes | Jest com projetos `logic` e `ui` | Regra MVVM verificada: lógica não pode importar `react-native` |
 
@@ -53,7 +53,32 @@ MVVM por feature: `src/features/<feature>/{model,viewmodel,view}`, rotas finas e
 
 O template traz a feature `session` completa como modelo: `createSessionStore` (boot → `restore()` pelo refresh no SecureStore → `signedIn`/`signedOut`), `login-screen` e o redirect por fase em `app/_layout.tsx` (também esconde a splash quando a fase sai de `booting`).
 
-### 3. Falando com o backend
+### 3. Layout: NativeWind é o padrão
+
+Toda tela e todo componente são escritos com `className` e utilitários do Tailwind. É assim que o app fica consistente e troca de tema sem esforço, e é o que os testes de UI esperam. O contrato de uma view:
+
+- **Cores só pelos tokens `app-*`** (`bg-app-bg`, `bg-app-surface`, `text-app-text`, `text-app-muted`, `border-app-border`, `bg-app-accent`, `text-app-danger`, `text-app-ok`). Eles são variáveis CSS que o `ThemeProvider` injeta por esquema, então nenhuma tela usa `dark:` nem hex. Cor nova: acrescente nos dois esquemas de `src/theme/tokens.ts` e em `keys` do `tailwind.config.js`.
+- **Espaçamento, tipografia, borda, flex e sombra pelo Tailwind** (`px-6`, `gap-4`, `rounded-xl`, `text-2xl font-bold`, `flex-row items-center`, `shadow-md`). `StyleSheet.create` e `style={{...}}` não aparecem em views. Sombra/elevação inclusive: `shadow-*` do NativeWind vira `shadow*` no iOS e `elevation` no Android; no tema escuro a sombra some, por isso todo card leva também `border border-app-border`.
+- **Onde `className` não chega** (`trackColor` do `Switch`, `tabBarStyle`, `screenOptions`, `ActivityIndicator`), leia a mesma paleta com `tokens[useSchemeName()]`.
+- **Peça repetida vira componente em `src/ui/`** (`Screen`, `Button`, `Field`, `Card`...), aceitando `className` para variação, em vez de duplicar classes entre telas.
+- **Nenhuma lib de componentes** (Paper, Tamagui, gluestack): os componentes são `View`/`Text`/`Pressable` com classes. Ícones: `@expo/vector-icons`.
+
+O modelo é `src/features/session/view/login-screen.tsx`: campo, botão e erro só com classes. Se as classes não surtirem efeito, algo destes cinco arquivos saiu do lugar (todos vêm no template): `babel.config.js` (`jsxImportSource: 'nativewind'` + preset `nativewind/babel`), `metro.config.js` (`withNativeWind(..., { input: './global.css' })`), `tailwind.config.js` (preset `nativewind/preset`, `content` cobrindo `app/` e `src/`, cores `var(--app-*)`), `global.css` (as três diretivas `@tailwind`) e `nativewind-env.d.ts` (tipos de `className`). `app/_layout.tsx` importa o `global.css` e envolve tudo no `ThemeProvider`.
+
+### 4. Estado: zustand + MMKV
+
+Um único gerenciador de estado no app inteiro: **zustand**. Um único lugar para estado persistido não sensível: **MMKV**, pelo `persist` do zustand. O que decide onde cada dado mora:
+
+| Dado | Onde mora |
+|---|---|
+| Vale para mais de um componente, sobrevive à navegação, ou vem do servidor | Store zustand em `src/features/<feature>/viewmodel/createXStore.ts` (factory com deps) + `useXStore.ts` (singleton) |
+| Precisa sobreviver ao fechar do app (preferências, filtro escolhido, cache de lista, rascunho) | A mesma store, com `persist(..., { name, storage: createJSONStorage(() => mmkvStateStorage) })` |
+| Segredo (token, chave, PIN embrulhado) | `vault` (SecureStore), nunca MMKV |
+| Efêmero de um componente só (texto sendo digitado, sheet aberta) | `useState` na view |
+
+Não entram: Redux, MobX, jotai, React Query/SWR, `Context` como store, `AsyncStorage`. Se um dado do servidor precisa de cache e revalidação, é uma store com `load()`, contador de geração e `sessionEnded` (regras 3 a 5 de `references/architecture.md`). `src/services/storage.ts` já exporta `mmkvStateStorage` e `resetPersistedStores()` (logout); `createSessionStore` e o teste dele mostram a factory com deps falsas.
+
+### 5. Falando com o backend
 
 - **REST** (template): `createApiClient` em `src/services/api/client.ts`. Um método por rota, resposta validada com o schema do contrato, `401 TOKEN_EXPIRED` → uma renovação single-flight → uma nova tentativa, header `X-App-Version` para o backend recusar builds velhos (`426`). O corpo de erro do contrato é `{ code, error }`: `code` estável para o app decidir, `error` em pt-BR para mostrar.
 - **GraphQL** (backend NestJS do `monorepo-setup`): reuse `@repo/graphql` com Apollo; client, auth link e retry em `references/graphql-client.md`.
@@ -61,7 +86,7 @@ O template traz a feature `session` completa como modelo: `createSessionStore` (
 
 URL da API: `EXPO_PUBLIC_API_URL`, do `.env` local no `expo start` e do `eas.json` por perfil no build. Tudo que é `EXPO_PUBLIC_*` fica legível dentro do app: **nunca segredo**. Emulador Android fala com o host em `10.0.2.2`; aparelho físico, pelo IP da máquina na LAN. Uma API atrás de Cloudflare Access não é alcançável pelo app: deixe a rota mobile fora do Access.
 
-### 4. Rodar
+### 6. Rodar
 
 ```bash
 cd apps/mobile
@@ -73,11 +98,11 @@ pnpm --filter mobile start                     # Metro; o dev build conecta
 
 `ios/` e `android/` nunca são commitados (o EAS gera no build). Mudou algo nativo (plugin, permissão, lib nativa)? Novo dev build. Só JS? Metro basta.
 
-### 5. Testes
+### 7. Testes
 
 `jest.config.js` tem dois projetos: `logic` (`*.test.ts`, Node puro, `react-native`/`expo-router` mockados para **lançar erro**) e `ui` (`*.test.tsx`, jest-expo + Testing Library). Fakes de MMKV e SecureStore em `test/fakes/`. Na RNTL 14, `render` e `fireEvent` são assíncronos: `await` nos dois. Veja os dois testes da feature `session` como modelo.
 
-### 6. Build e lojas
+### 8. Build e lojas
 
 `references/build-and-release.md`: perfis `development`/`preview`/`production`, monorepo no EAS, typecheck/test em Docker (servidor sem Node), build disparado com `EXPO_TOKEN`, credenciais Apple/Google, permissões com texto em pt-BR, push com `expo-notifications`, checklist antes de produção.
 

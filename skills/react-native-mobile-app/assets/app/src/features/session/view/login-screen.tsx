@@ -30,7 +30,7 @@ export function LoginScreen() {
         />
         {error ? <Text className="text-app-danger">{error}</Text> : null}
         <Pressable accessibilityRole="button" className="items-center rounded-xl bg-app-accent py-3" disabled={busy} onPress={() => void login(email, password)}>
-          {busy ? <ActivityIndicator color="#fff" /> : <Text className="font-semibold text-white">Continuar</Text>}
+          {busy ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Continuar</Text>}
         </Pressable>
       </View>
     </Screen>

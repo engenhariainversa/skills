@@ -33,6 +33,8 @@ test/                         setups do Jest, fakes de módulos nativos, helpers
 5. **Estado vindo do servidor entra por um caminho só.** Ex.: num chat, a mensagem aparece quando o evento do socket chega, nunca com append local no envio; evita duplicata e divergência.
 6. **Toda resposta é validada com zod** do contrato compartilhado. Resposta fora do contrato vira `ApiError(502, 'BAD_RESPONSE')`, nunca um `SyntaxError` com HTML de portal cativo na tela.
 7. **Textos visíveis em pt-BR; código, comentários e commits como o resto do repo.**
+8. **Layout só com NativeWind** (`className` + tokens `app-*`); sem `StyleSheet`, hex ou lib de componentes. Contrato completo na SKILL.md, passo 3.
+9. **Estado só em zustand, persistência só em MMKV** (via `persist`) ou no `vault` quando é segredo. `useState` fica restrito ao efêmero de um componente. Tabela na SKILL.md, passo 4.
 
 ## Modo mock
 
