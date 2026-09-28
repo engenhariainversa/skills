@@ -1,0 +1,39 @@
+{
+  "name": "backend",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/express5": "^1.1.2",
+    "@nestjs/apollo": "^13",
+    "@nestjs/common": "^11",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11",
+    "@nestjs/graphql": "^13",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11",
+    "graphql": "^16.14.2",
+    "graphql-subscriptions": "^3.0.0",
+    "graphql-ws": "^6.0.0",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11",
+    "@nestjs/schematics": "^11",
+    "@repo/tsconfig": "workspace:*",
+    "@types/express": "^5.0.6",
+    "@types/passport-jwt": "^4.0.1",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.4.5"
+  }
+}

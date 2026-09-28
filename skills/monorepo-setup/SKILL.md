@@ -1,6 +1,6 @@
 ---
 name: monorepo-setup
-description: Monta ou estende um monorepo TypeScript com pnpm workspaces + Turborepo no padrão apps/ + packages/ (Next.js para landing e CMS, NestJS para backend, Prisma em @repo/database, tsconfig e eslint compartilhados), com um único Dockerfile multi-target, compose de dev com hot reload e compose de produção, e deploy por runner self-hosted com secrets do GitHub. Use sempre que o usuário falar em "monorepo", "workspaces", "turborepo", "apps e packages compartilhados", "landing + cms + api no mesmo repo", "adicionar um app/package ao monorepo", "colocar o app mobile/Expo no monorepo (apps/mobile)" ou quando dois ou mais apps precisam dividir tipos, banco ou componentes.
+description: Monta ou estende um monorepo TypeScript com pnpm workspaces + Turborepo no padrão apps/ + packages/ (Next.js para landing e CMS, NestJS GraphQL code-first com Subscriptions via WebSocket para backend, client Apollo compartilhado em @repo/graphql, Prisma em @repo/database, tsconfig e eslint compartilhados), com um único Dockerfile multi-target, compose de dev com hot reload e compose de produção, e deploy por runner self-hosted com secrets do GitHub. Use sempre que o usuário falar em "monorepo", "workspaces", "turborepo", "apps e packages compartilhados", "landing + cms + api no mesmo repo", "adicionar um app/package ao monorepo", "colocar o app mobile/Expo no monorepo (apps/mobile)", "backend GraphQL", "subscription/tempo real/WebSocket no GraphQL" ou quando dois ou mais apps precisam dividir tipos, banco ou componentes.
 ---
 
 # Monorepo pnpm + Turborepo, tudo em Docker
@@ -14,11 +14,11 @@ Referência viva: `github.com/engenhariainversa/platform-monorepo` (landing + CM
 ├── apps/
 │   ├── landing/        Next.js (site público)             porta 4052
 │   ├── cms/            Next.js (painel)                   porta 4051
-│   ├── backend/        NestJS + GraphQL code-first        porta 4050
+│   ├── backend/        NestJS + GraphQL code-first + Subscriptions (graphql-ws)   porta 4050
 │   └── mobile/         Expo/React Native (opcional)       fora do Docker, build no EAS
 ├── packages/
 │   ├── database/       Prisma: schema, migrations, client (@repo/database)
-│   ├── graphql/        client Apollo + queries + tipos    (@repo/graphql)
+│   ├── graphql/        client Apollo (HTTP + WebSocket) + queries + tipos (@repo/graphql)
 │   ├── types/          tipos compartilhados               (@repo/types)
 │   ├── ui/             componentes Tailwind               (@repo/ui)
 │   ├── tsconfig/       base.json, nextjs.json, nestjs.json
@@ -34,7 +34,7 @@ Referência viva: `github.com/engenhariainversa/platform-monorepo` (landing + CM
 └── .github/workflows/deploy.yml
 ```
 
-Templates prontos em `assets/` (root, packages, docker, github). Copie e troque os placeholders `<...>`.
+Templates prontos em `assets/` (root, packages, backend, docker, github). Copie e troque os placeholders `<...>`.
 
 ## Convenções que seguram o monorepo
 
@@ -46,6 +46,22 @@ Templates prontos em `assets/` (root, packages, docker, github). Copie e troque 
 - **Migrations, nunca `db push`**: o script `db:push` existe só para falhar com a mensagem explicando. Fluxo: `db:migrate:dev --name <descritivo>` em dev, `db:migrate:deploy` no boot do backend em produção, `db:migrate:check` no pipeline para pegar drift.
 - **Portas fixas por app** (4050/4051/4052) em `package.json`, compose e `PORT`. Vários monorepos no mesmo host não colidem se cada um tiver sua faixa.
 - **`.env.example` com defaults de dev reais** (credenciais do Postgres do compose de dev). Produção nunca lê esse arquivo: os valores vêm de secrets.
+
+## Backend GraphQL: nasce com Subscriptions
+
+O backend do template (`assets/backend/`) já sobe com os três tipos de operação: query e mutation por HTTP e **subscription por WebSocket**, protocolo `graphql-ws`, no mesmo path `/graphql`. Ligar isso no dia 1 custa quatro arquivos; ligar depois custa reabrir auth, proxy e client. As peças:
+
+| Peça | Arquivo | O que faz |
+|---|---|---|
+| Servidor WS | `src/app.module.ts` | `subscriptions: { 'graphql-ws': { path, onConnect } }`; `onConnect` copia `connectionParams.authorization` para o header da request do upgrade; `context` normaliza `req` para HTTP e WS |
+| Auth única | `src/auth/gql-auth.guard.ts` | `GqlAuthGuard` (passport-jwt) lê `ctx.req` nos três tipos de operação; `@CurrentUser()` dá o usuário ao resolver |
+| Barramento | `src/pubsub/pubsub.module.ts` | `PUB_SUB` global (`graphql-subscriptions`); em memória para uma instância, `RedisPubSub` quando houver réplicas |
+| Exemplo | `src/events/events.resolver.ts` | mutation `notify` publica; `@Subscription notificationAdded` assina com `filter` por usuário e guard |
+| Client | `packages/graphql/src/client/create-client.ts` | `createApolloClient({ uri, wsUri, getToken })`: `split` manda subscription para `GraphQLWsLink` e o resto para `HttpLink`; token em header e em `connectionParams` |
+
+Uma subscription nova é: publicar no `PUB_SUB` onde o estado muda (service, job, webhook), um método `@Subscription(() => Tipo, { filter })` que devolve `pubSub.asyncIterableIterator('topico')`, e no client `useSubscription`/`client.subscribe` com o documento. Passo a passo, auth, proxy e teste de terminal em `references/graphql-subscriptions.md`.
+
+O template vem sem banco de propósito (o `notify` de exemplo só publica). Com dados de verdade, adicione `@repo/database` ao backend e publique no PubSub logo depois de gravar. O nginx do proxy já repassa `Upgrade`/`Connection` e o Cloudflare Tunnel aceita WebSocket, então `wss://api.<dominio>/graphql` funciona sem rota nem porta extra. O app mobile usa o mesmo `createApolloClient` (skill `react-native-mobile-app` → `references/graphql-client.md`).
 
 ## Docker
 

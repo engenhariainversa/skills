@@ -1,53 +1,68 @@
 # App mobile falando com backend GraphQL (NestJS)
 
-No monorepo de `monorepo-setup` o backend é NestJS GraphQL code-first e já existe `@repo/graphql` (client Apollo + queries + tipos) usado pelos apps Next. O app mobile reusa o mesmo package: as queries e os tipos gerados são os mesmos, só muda a criação do client.
+No monorepo de `monorepo-setup` o backend é NestJS GraphQL code-first **com Subscriptions** (`graphql-ws`) e existe `@repo/graphql` com `createApolloClient` (HTTP + WebSocket), queries e tipos usados pelos apps Next. O app mobile reusa o mesmo package: só muda de onde vem a URL e o token.
 
 ## Onde encaixa na arquitetura do template
 
-- `src/services/api/` passa a exportar um `ApolloClient` em vez do client REST. A regra continua: **views não chamam API**; as stores (viewmodels) chamam `client.query/mutate` e expõem estado. Hooks `useQuery` direto na tela são aceitáveis para leitura simples, mas perdem o teste em Node puro.
+- `src/services/api/` passa a exportar o `ApolloClient` em vez do client REST. A regra continua: **views não chamam API**; as stores (viewmodels) chamam `client.query/mutate/subscribe` e expõem estado. Hooks `useQuery`/`useSubscription` direto na tela perdem o teste em Node puro; use só em leitura descartável.
 - Auth igual ao template: refresh no SecureStore, access em memória na session store, `renew()` single-flight.
 - Se parte da API for REST (upload, webhook, health), mantenha o `Transport` para essa parte.
 
-## Client (Apollo Client 3.x)
+## Client
 
 ```ts
 // src/services/api/apollo.ts
-import { ApolloClient, HttpLink, InMemoryCache, from, fromPromise } from '@apollo/client';
-import { setContext } from '@apollo/client/link/context';
-import { onError } from '@apollo/client/link/error';
+import { createApolloClient } from '@repo/graphql';
 import { API_URL } from './config';
+import { useSessionStore } from '@/features/session/viewmodel/useSessionStore';
 
-let getToken: () => string | null = () => null;
-let renew: () => Promise<string | null> = async () => null;
-export function bindSession(get: typeof getToken, r: typeof renew) { getToken = get; renew = r; }
-
-const auth = setContext((_, { headers }) => {
-  const token = getToken();
-  return { headers: { ...headers, ...(token ? { authorization: `Bearer ${token}` } : {}) } };
+export const apollo = createApolloClient({
+  uri: `${API_URL}/graphql`,
+  wsUri: `${API_URL.replace(/^http/, 'ws')}/graphql`,
+  getToken: () => useSessionStore.getState().accessToken,
+  // React Native já tem WebSocket global: não passe webSocketImpl.
 });
 
-// UNAUTHENTICATED → renova uma vez e repete a operação. Outros erros sobem para quem chamou.
-const retryOnExpired = onError(({ graphQLErrors, operation, forward }) => {
-  if (!graphQLErrors?.some((e) => e.extensions?.code === 'UNAUTHENTICATED')) return;
-  if (operation.getContext().retried) return;
-  return fromPromise(renew()).filter(Boolean).flatMap((token) => {
-    operation.setContext(({ headers = {} }) => ({ retried: true, headers: { ...headers, authorization: `Bearer ${token}` } }));
-    return forward(operation);
-  });
-});
-
-export const apollo = new ApolloClient({
-  link: from([retryOnExpired, auth, new HttpLink({ uri: `${API_URL}/graphql` })]),
-  cache: new InMemoryCache(),
+// Token mudou (login, refresh, logout): derruba o WS; o graphql-ws reconecta com o token novo.
+useSessionStore.subscribe((s, prev) => {
+  if (s.accessToken !== prev.accessToken) apollo.wsClient?.terminate();
 });
 ```
 
-Apollo Client 4 mudou a API dos links (classes `SetContextLink`/`ErrorLink`, imports de React em `@apollo/client/react`). Use a mesma major que `@repo/graphql` já usa e confira a doc dela antes de copiar.
+`401`/`UNAUTHENTICATED` no HTTP: a session store faz `renew()` e a store que chamou repete a operação uma vez (mesmo desenho do client REST do template). Numa subscription, o erro chega em `result.error` dentro de `next` (Apollo Client 4); trate ali: `renew()` e `terminate()` para reassinar.
+
+## Subscription dentro de uma store
+
+Estado do servidor entra por um caminho só (regra 5 de `architecture.md`): a subscription alimenta a store, e a view só lê.
+
+```ts
+// src/features/notifications/viewmodel/createNotificationsStore.ts
+export function createNotificationsStore(deps: { apollo: ApolloClient }) {
+  let sub: { unsubscribe(): void } | null = null;
+  const store = create<State>()((set) => ({
+    items: [],
+    start() {
+      sub?.unsubscribe();
+      sub = deps.apollo.subscribe({ query: NOTIFICATION_ADDED }).subscribe({
+        next: (r) => {
+          if (r.error) return set({ error: r.error.message });
+          if (r.data) set((s) => ({ items: [r.data!.notificationAdded, ...s.items] }));
+        },
+      });
+    },
+    stop() { sub?.unsubscribe(); sub = null; },
+  }));
+  sessionEnded.subscribe(() => { store.getState().stop(); store.setState({ items: [] }); });
+  return store;
+}
+```
+
+`start()` é chamado pela view da tela que precisa (ou pelo `_layout` quando a sessão vira `signedIn`); `stop()` no `sessionEnded`. Em background o iOS fecha o socket: o `graphql-ws` reconecta ao voltar (`appForeground`), sem código extra.
 
 ## Pontos de atenção
 
-- `API_URL` no emulador Android: `http://10.0.2.2:<porta>`; aparelho físico: IP da máquina na LAN; produção: HTTPS atrás do proxy (skill `docker-nginx-cloudflare-proxy`). Cloudflare Access na frente da API bloqueia o app: a rota da API mobile precisa ficar fora do Access (ou usar service token).
+- `API_URL` no emulador Android: `http://10.0.2.2:<porta>`; aparelho físico: IP da máquina na LAN; produção: `https://api.<dominio>` atrás do proxy (skill `docker-nginx-cloudflare-proxy`), e o WS vira `wss://` sozinho. Cloudflare Access na frente da API bloqueia o app: a rota da API mobile fica fora do Access.
 - CORS não se aplica ao app nativo, mas o backend pode recusar requests sem `Origin`; confira o guard.
-- Subscriptions (tempo real): `graphql-ws` sobre WebSocket; o RN aceita headers no construtor do WebSocket (`new WebSocket(url, undefined, { headers })`), útil para mandar o Bearer no upgrade.
-- Testes: stores recebem o client por injeção (`createXStore({ apollo })`), e o teste passa um client com `SchemaLink`/mocks ou `MockedProvider` nas telas.
-- `@repo/graphql` exporta fonte TS: o Metro transpila packages do workspace, mas o Jest precisa do `@repo` no `transformIgnorePatterns` (já está no `jest.config.js` do template).
+- Testes: stores recebem o client por injeção (`createXStore({ apollo })`); o teste passa um client com `SchemaLink` sobre o schema do backend ou um `ApolloLink` falso que emite os resultados desejados (inclusive para subscription, que é só um Observable).
+- `@repo/graphql` exporta fonte TS: o Metro transpila packages do workspace, mas o Jest precisa do `@repo` no `transformIgnorePatterns` (já está no `jest.config.js` do template). Mantenha **uma** versão de `graphql-ws` e `@apollo/client` no lockfile (`pnpm why graphql-ws`); duas cópias quebram o `split`.
+- Detalhes do lado do servidor (guard único, `filter`, Redis com réplicas, teste de terminal): `references/graphql-subscriptions.md` da skill `monorepo-setup`.

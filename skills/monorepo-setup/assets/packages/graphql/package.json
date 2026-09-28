@@ -1,0 +1,24 @@
+{
+  "name": "@repo/graphql",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client/index.ts",
+    "./queries": "./src/queries/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@apollo/client": "^4.2.6",
+    "graphql": "^16.14.2",
+    "graphql-ws": "^6.0.0",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/node": "^20.12.7",
+    "typescript": "^5.4.5"
+  }
+}
