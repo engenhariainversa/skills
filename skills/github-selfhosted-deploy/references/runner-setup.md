@@ -2,6 +2,8 @@
 
 Pré-requisitos: `gh` autenticado com permissão de admin no repo, Docker acessível pelo usuário do serviço, sudo para instalar o serviço.
 
+`scripts/runner-register.sh` faz os passos 1 e 2 e imprime o 3 (e a pasta de deploy, se precisar) como um bloco de sudo. Os passos abaixo são o mesmo fluxo à mão.
+
 ## 1. Baixar o runner numa pasta própria
 
 Uma pasta por runner. Use a mesma versão dos runners já instalados (`<pasta>/config.sh --version`) ou a mais recente em https://github.com/actions/runner/releases.
@@ -26,6 +28,13 @@ O token de registro vale 1 hora e é gerado pela API; passe direto para o `confi
 `--labels` deve bater com o `runs-on` do workflow. O nome só precisa ser único.
 
 ## 3. Instalar como serviço
+
+O `sudo` pede senha num TTY: rode num terminal interativo (aba do termhub, SSH), não pelo agente nem por `!` no Claude Code. Se o `DEPLOY_DIR` for fora da área do usuário, crie a pasta no mesmo bloco, já com o dono que roda o runner, para o `git clone` e o `docker compose` do job não precisarem de sudo:
+
+```bash
+sudo install -d -o <usuario-do-servidor> -g <grupo> /opt/<projeto>
+git clone https://github.com/<owner>/<repo>.git /opt/<projeto>
+```
 
 ```bash
 sudo ./svc.sh install <usuario-do-servidor>
