@@ -20,3 +20,16 @@ Instruções para o Claude Code neste repositório.
 - Rodar no host com `pnpm dev` é o caminho difícil: exige `NEXT_PUBLIC_*` exportadas e o Prisma roda de `packages/database`, que não lê o `.env` da raiz. O compose de dev evita tudo isso.
 - Comandos por pacote sempre com `pnpm --filter <nome> <script>`, de preferência dentro do container: `docker compose -f docker-compose.dev.yml exec backend pnpm --filter @repo/database db:migrate:dev --name <descritivo>`.
 - Nunca `prisma db push`: o script está desabilitado de propósito. Toda alteração de schema vira migration.
+- Migration só via `db:migrate:dev --name <descritivo>`: nunca criar a pasta nem escrever o timestamp à mão, nunca editar migration que já está na `main`. Se a `main` ganhou migration no meio da história: rebase, apague a sua e gere de novo.
+
+## Trabalho em paralelo (vários agentes)
+
+- A história sai da `main` atual e volta para a `main` num PR pequeno. Sem branch de épico; precisou de código de outra história, espere ela entrar na `main` e faça rebase, nunca copie.
+- Só comece uma história quando as dependências dela já estão na `main`.
+- Escreva em arquivos do seu domínio, não em arquivos centrais:
+  - model novo em `packages/database/prisma/models/<dominio>.prisma`;
+  - backend: o módulo do domínio (`src/<dominio>/<dominio>.module.ts`) registra os próprios providers; o `AppModule` só ganha a linha de import quando o domínio é novo;
+  - pacotes compartilhados: export por subcaminho do domínio (`@repo/graphql/<dominio>`), não no `index.ts` da raiz;
+  - decisão de arquitetura: `docs/decisions/<CARD>-<slug>.md`, sem numeração global.
+- Conflito no `pnpm-lock.yaml`: aceite o da `main` e rode `pnpm install` de novo; nunca edite o lockfile à mão.
+- Abra o PR e pare: quem mescla é a automação com o `PR check` verde, salvo instrução explícita.

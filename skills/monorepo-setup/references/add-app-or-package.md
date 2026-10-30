@@ -10,6 +10,15 @@
 4. `pnpm install` dentro do container de dev (atualiza `pnpm-lock.yaml`): `docker compose -f docker-compose.dev.yml exec backend pnpm install`. O stage `deps` do Dockerfile já copia `packages/` inteiro, nada a mudar lá.
 5. Se o package precisa aparecer no hot reload, adicione `./packages/<nome>/src:/app/packages/<nome>/src` nos volumes dos apps que o usam em `docker-compose.dev.yml`.
 
+## Domínio novo no backend
+
+Cada domínio vive em arquivos próprios, para que histórias de domínios diferentes não se encontrem no mesmo arquivo (`parallel-work.md`):
+
+1. `packages/database/prisma/models/<dominio>.prisma` com os models; `db:migrate:dev --name <dominio>_init` no container de dev.
+2. `apps/backend/src/<dominio>/<dominio>.module.ts` registrando resolvers/services do domínio; o `AppModule` ganha **só** a linha de import do módulo. Provider usado e não listado em `providers` só aparece no boot, por isso o `pr-check.yml` sobe a imagem de produção.
+3. Queries/tipos do client em `packages/graphql/src/<dominio>/index.ts` + entrada `"./<dominio>"` em `exports`; quem consome importa `@repo/graphql/<dominio>`.
+4. Decisão que valha registrar: `docs/decisions/<CARD>-<slug>.md`.
+
 ## App novo (`apps/<app>`)
 
 1. Escolha a próxima porta da faixa (ex.: 4053) e fixe em `package.json` (`dev`/`start` com `--port`), `PORT` e nos dois composes.

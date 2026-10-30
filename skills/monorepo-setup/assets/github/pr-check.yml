@@ -1,0 +1,78 @@
+name: PR check
+
+# Roda em todo PR para a main. Pega o que typecheck/lint não pegam e que antes só aparecia
+# no deploy: provider Nest sem registro no módulo (o backend morre no boot), dependência fora
+# do package.json (a imagem usa --frozen-lockfile), migration fora de ordem ou que não
+# reconstrói o schema. Exija este check na proteção da main e deixe a automação mesclar.
+#
+# Runner hospedado do GitHub de propósito: o compose publica as mesmas portas da produção
+# e o CI não deve disputar a máquina com o deploy no runner self-hosted.
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Migrations ordered after main, none edited
+        run: bash .github/scripts/check-migration-order.sh origin/${{ github.base_ref }}
+
+  production-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Valores descartáveis só para o compose de produção aceitar subir.
+      COMPOSE: docker compose --env-file .env.ci -f docker-compose.yml -p ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write throwaway .env
+        run: |
+          cat > .env.ci <<'ENV'
+          POSTGRES_USER=ci
+          POSTGRES_PASSWORD=ci
+          POSTGRES_DB=ci
+          DATABASE_URL=postgresql://ci:ci@db:5432/ci
+          JWT_SECRET=ci-only-not-a-secret
+          NEXT_PUBLIC_API_URL=http://localhost:4050
+          NEXT_PUBLIC_GRAPHQL_PATH=/graphql
+          ENV
+
+      - name: Build every production image
+        run: $COMPOSE build
+
+      # Banco vazio: o boot do backend roda `migrate deploy` desde a primeira migration.
+      - name: Start db + backend
+        run: $COMPOSE up -d db backend
+
+      - name: Wait for backend to be healthy
+        run: |
+          cid=$($COMPOSE ps -q backend)
+          for i in $(seq 1 60); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' "$cid" 2>/dev/null || echo missing)
+            echo "attempt $i: backend health = $status"
+            [ "$status" = "healthy" ] && exit 0
+            sleep 5
+          done
+          echo "backend did not become healthy"
+          $COMPOSE logs --tail=200 backend
+          exit 1
+
+      # Banco montado só pelas migrations == schema da pasta prisma/? Se não, falta migration
+      # ou alguém escreveu uma à mão.
+      - name: Migrations rebuild the schema
+        run: $COMPOSE exec -T backend pnpm --filter @repo/database db:migrate:check
+
+      - name: Tear down
+        if: always()
+        run: $COMPOSE down -v

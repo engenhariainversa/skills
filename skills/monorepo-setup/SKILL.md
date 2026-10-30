@@ -1,6 +1,6 @@
 ---
 name: monorepo-setup
-description: Monta ou estende um monorepo TypeScript com pnpm workspaces + Turborepo no padrão apps/ + packages/ (Next.js para landing e CMS, NestJS GraphQL code-first com Subscriptions via WebSocket para backend, client Apollo compartilhado em @repo/graphql, Prisma em @repo/database, tsconfig e eslint compartilhados), com um único Dockerfile multi-target, compose de dev com hot reload e compose de produção, e deploy por runner self-hosted com secrets do GitHub. Use sempre que o usuário falar em "monorepo", "workspaces", "turborepo", "apps e packages compartilhados", "landing + cms + api no mesmo repo", "adicionar um app/package ao monorepo", "colocar o app mobile/Expo no monorepo (apps/mobile)", "backend GraphQL", "subscription/tempo real/WebSocket no GraphQL" ou quando dois ou mais apps precisam dividir tipos, banco ou componentes.
+description: Monta ou estende um monorepo TypeScript com pnpm workspaces + Turborepo no padrão apps/ + packages/ (Next.js para landing e CMS, NestJS GraphQL code-first com Subscriptions via WebSocket para backend, client Apollo compartilhado em @repo/graphql, Prisma em @repo/database, tsconfig e eslint compartilhados), com um único Dockerfile multi-target, compose de dev com hot reload e compose de produção, e deploy por runner self-hosted com secrets do GitHub. Use sempre que o usuário falar em "monorepo", "workspaces", "turborepo", "apps e packages compartilhados", "landing + cms + api no mesmo repo", "adicionar um app/package ao monorepo", "colocar o app mobile/Expo no monorepo (apps/mobile)", "backend GraphQL", "subscription/tempo real/WebSocket no GraphQL", "vários agentes em paralelo no mesmo repo", "planejar épicos/histórias para agentes", "CI de PR", "conflito de migration" ou quando dois ou mais apps precisam dividir tipos, banco ou componentes.
 ---
 
 # Monorepo pnpm + Turborepo, tudo em Docker
@@ -17,7 +17,7 @@ Referência viva: `github.com/engenhariainversa/platform-monorepo` (landing + CM
 │   ├── backend/        NestJS + GraphQL code-first + Subscriptions (graphql-ws)   porta 4050
 │   └── mobile/         Expo/React Native (opcional)       fora do Docker, build no EAS
 ├── packages/
-│   ├── database/       Prisma: schema, migrations, client (@repo/database)
+│   ├── database/       Prisma: schema em pasta (um .prisma por domínio), migrations, client (@repo/database)
 │   ├── graphql/        client Apollo (HTTP + WebSocket) + queries + tipos (@repo/graphql)
 │   ├── types/          tipos compartilhados               (@repo/types)
 │   ├── ui/             componentes Tailwind               (@repo/ui)
@@ -31,7 +31,11 @@ Referência viva: `github.com/engenhariainversa/platform-monorepo` (landing + CM
 ├── docker-compose.yml  produção (exige POSTGRES_*, JWT_SECRET, NEXT_PUBLIC_*)
 ├── docker-compose.dev.yml  dev com hot reload e credenciais fixas de dev
 ├── .env.example        defaults de dev, seguro de commitar
-└── .github/workflows/deploy.yml
+├── docs/decisions/     uma decisão por arquivo, nomeada pelo card (sem numeração global)
+└── .github/
+    ├── workflows/deploy.yml     push na main → produção
+    ├── workflows/pr-check.yml   PR → imagens de produção + boot + migrations
+    └── scripts/check-migration-order.sh
 ```
 
 Templates prontos em `assets/` (root, packages, backend, docker, github). Copie e troque os placeholders `<...>`.
@@ -43,7 +47,9 @@ Templates prontos em `assets/` (root, packages, backend, docker, github). Copie 
 - **tsconfig compartilhado**: cada app estende `@repo/tsconfig/nextjs.json` ou `nestjs.json`; cada package estende `base.json`. O app só declara `paths` e `include`.
 - **Packages consumidos como fonte** (`ui`, `graphql`, `types`): `exports` aponta para `./src/index.ts` e o Next.js recebe `transpilePackages: ["@repo/ui", "@repo/graphql", "@repo/types"]`. Sem passo de build, hot reload atravessa pacotes.
 - **`@repo/database` é compilado**: `build = prisma generate && tsc`, `main` aponta para `dist/`. O backend (NestJS, CommonJS) precisa de JS pronto, e o Prisma Client precisa ser gerado antes de qualquer `tsc` que o importe. Por isso `turbo.json` tem `build.dependsOn: ["^build"]`.
-- **Migrations, nunca `db push`**: o script `db:push` existe só para falhar com a mensagem explicando. Fluxo: `db:migrate:dev --name <descritivo>` em dev, `db:migrate:deploy` no boot do backend em produção, `db:migrate:check` no pipeline para pegar drift.
+- **Migrations, nunca `db push`**: o script `db:push` existe só para falhar com a mensagem explicando. Fluxo: `db:migrate:dev --name <descritivo>` em dev (nunca pasta ou timestamp escritos à mão), `db:migrate:deploy` no boot do backend em produção, `db:migrate:check` no pipeline para pegar drift.
+- **Schema Prisma em pasta** (Prisma ≥ 6.7): `prisma/schema.prisma` só com `generator` e `datasource`, models em `prisma/models/<dominio>.prisma`, `"prisma": { "schema": "./prisma" }` no `package.json` do `@repo/database`. Migrations continuam em `prisma/migrations`. Um arquivo por domínio é o que deixa duas histórias mexerem no banco sem conflito.
+- **Nada de arquivo central que toda feature edita**: um módulo Nest por domínio (registra os próprios providers, importado uma vez no `AppModule`), exports por subcaminho por domínio nos packages-fonte (`@repo/graphql/<dominio>`) em vez de crescer o `index.ts`, decisões em `docs/decisions/<CARD>-<slug>.md`.
 - **Portas fixas por app** (4050/4051/4052) em `package.json`, compose e `PORT`. Vários monorepos no mesmo host não colidem se cada um tiver sua faixa.
 - **`.env.example` com defaults de dev reais** (credenciais do Postgres do compose de dev). Produção nunca lê esse arquivo: os valores vêm de secrets.
 
@@ -99,6 +105,18 @@ Para domínio e TLS, cada serviço público (landing, cms, backend) entra na red
 
 Secrets necessários no repo: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL` (host `db`), `JWT_SECRET` (`openssl rand -hex 64`), `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_GRAPHQL_PATH`. Liste-os no `.env.example` para ninguém precisar caçar.
 
+## CI de PR e trabalho em paralelo
+
+`assets/github/pr-check.yml` (+ `scripts/check-migration-order.sh`) roda em todo PR: monta **todas as imagens de produção**, sobe `db` + `backend` num banco vazio, espera o healthcheck e confere que as migrations reconstroem o schema; outro job barra migration que ordena antes da última da `main`, migration já mesclada editada e nome fora do formato do Prisma. Typecheck não pega provider Nest sem registro nem dependência fora do `package.json`; o boot da imagem de produção pega. Exija esse check na proteção da `main`.
+
+Antes de dividir o trabalho em épicos e soltar mais de um agente no repo, leia `references/parallel-work.md`. O resumo do que deu errado num caso real (11 épicos, 40 histórias lançadas juntas, staging derrubado duas vezes, um dia de integração manual) e das regras que evitam isso:
+
+- história sai da `main` e volta para a `main` em PR pequeno; épico é agrupamento no quadro, não branch;
+- uma história por vez por padrão; 2–3 em paralelo só em áreas diferentes; história que toca schema ou dependências vai para a fila; só começa quando as dependências estão na `main`;
+- schema em pasta, módulo por domínio, exports por subcaminho, decisões por card (acima);
+- merge pela automação com CI verde, não pelo agente (se o agente precisar mesclar, libere `gh pr merge` nas permissões do Claude Code da máquina);
+- deploy que falha pausa a automação: retomá-la faz parte da correção, senão o trabalho para sem aviso.
+
 ## Adicionar um app ou package
 
 Checklist em `references/add-app-or-package.md`. O resumo: `package.json` com nome e `workspace:*`, `tsconfig.json` estendendo o compartilhado, `transpilePackages` se for Next, linha no stage `deps` do Dockerfile, stages `<app>-build` e `<app>`, serviço nos dois composes com porta nova, conf no nginx se for público. Rode `pnpm install` dentro do container de dev para atualizar o lockfile.
@@ -107,4 +125,4 @@ Checklist em `references/add-app-or-package.md`. O resumo: `package.json` com no
 
 ## CLAUDE.md do monorepo
 
-Coloque na raiz as três regras que evitam a maior parte dos erros: checar `docker info` antes de qualquer `docker compose`; usar `docker-compose.dev.yml` para desenvolvimento (o compose sem sufixo é produção e recusa subir sem secrets); rodar Prisma sempre pelo container ou via `pnpm --filter @repo/database`, porque o package não lê o `.env` da raiz. Template em `assets/root/CLAUDE.md`.
+Coloque na raiz as três regras que evitam a maior parte dos erros: checar `docker info` antes de qualquer `docker compose`; usar `docker-compose.dev.yml` para desenvolvimento (o compose sem sufixo é produção e recusa subir sem secrets); rodar Prisma sempre pelo container ou via `pnpm --filter @repo/database`, porque o package não lê o `.env` da raiz. O template (`assets/root/CLAUDE.md`) também traz as regras de trabalho em paralelo, que é onde cada agente de história vai lê-las.

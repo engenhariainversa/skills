@@ -15,3 +15,7 @@ Contexto para adaptar sem quebrar. Leia quando for desviar do template.
 - **`.env` de produção escrito pelo pipeline em `/opt/<projeto>/.env` com `chmod 600`**: o checkout do runner é limpo a cada run; o `.env` fora do checkout sobrevive e não entra no git.
 - **Healthcheck em Node puro**: as imagens alpine não trazem `curl`/`wget` garantidos; `net.createConnection` está sempre disponível.
 - **Volumes de dev só nas pastas de código**: montar `.:/app` esconderia o `node_modules` e o `dist` gerados na imagem, e o `node_modules` do host (se existir) seria de outro SO.
+- **Schema Prisma em pasta, módulo Nest por domínio, exports por subcaminho, decisões por card**: com vários agentes no repo, todo arquivo que cresce a cada feature vira conflito garantido. Arquivo por domínio troca conflito de texto por arquivos novos que o git junta sozinho.
+- **CI de PR monta as imagens de produção e sobe o backend**: typecheck e lint passam com provider Nest sem registro e com dependência que só existe hoisted no dev. O boot da imagem de produção é o teste que pega os dois, e precisa acontecer antes do merge, não no deploy.
+- **CI de PR em runner hospedado, deploy no self-hosted**: o compose do CI publica as mesmas portas da produção; no runner do servidor ele brigaria com os containers no ar.
+- **Ordem de migration checada no CI**: o Prisma aplica por ordem de nome. Migration de uma branch velha com timestamp anterior à última da `main` é aplicada fora de ordem (ou pulada em quem já está à frente) e só quebra em produção.
