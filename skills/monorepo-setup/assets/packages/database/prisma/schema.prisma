@@ -1,0 +1,12 @@
+// Só generator e datasource. Os models ficam em models/<dominio>.prisma, um arquivo por domínio,
+// para histórias paralelas não editarem o mesmo arquivo (references/parallel-work.md).
+// O package.json aponta "prisma.schema" para esta pasta; as migrations continuam em prisma/migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

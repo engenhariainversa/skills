@@ -1,4 +1,5 @@
-// Trecho para packages/database/prisma/schema.prisma.
+// Trecho para o arquivo do domínio em packages/database/prisma/models/<dominio>.prisma
+// (schema em pasta, skill monorepo-setup) ou para o schema.prisma único em projetos antigos.
 // `embedding` é Unsupported: o Prisma Client não lê nem escreve essa coluna. Toda leitura/escrita
 // dela passa por $queryRaw/$executeRaw (assets/src/vector-repository.ts). O resto do model continua
 // usável pelo client normal (findMany, updateMany, count...).

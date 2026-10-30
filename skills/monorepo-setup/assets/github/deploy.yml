@@ -63,7 +63,7 @@ jobs:
             sleep 5
           done
 
-      - name: Verify DB schema matches schema.prisma (drift check)
+      - name: Verify DB schema matches prisma/ schema folder (drift check)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |

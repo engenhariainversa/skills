@@ -1,0 +1,9 @@
+// Um arquivo por domínio. Relações entre arquivos funcionam normalmente (o Prisma junta a pasta).
+// Domínio novo = arquivo novo aqui + `db:migrate:dev --name <descritivo>`; nunca editar outro domínio
+// "de passagem" numa história que não é dele.
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}

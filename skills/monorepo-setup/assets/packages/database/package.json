@@ -13,16 +13,17 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:status": "prisma migrate status",
     "db:migrate:resolve": "prisma migrate resolve",
-    "db:migrate:check": "prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code || (echo '\\n❌ DB schema drifts from schema.prisma — someone bypassed migrations (likely with db push).\\n   Fix by generating a migration:  pnpm --filter @repo/database db:migrate:dev --name <descriptive>\\n' && exit 1)"
+    "db:migrate:check": "prisma migrate diff --from-schema-datasource prisma --to-schema-datamodel prisma --exit-code || (echo '\\n❌ DB schema drifts from prisma/ (schema.prisma + models/*.prisma) — migrations missing or bypassed (db push, hand-written migration).\\n   Fix by generating a migration:  pnpm --filter @repo/database db:migrate:dev --name <descriptive>\\n' && exit 1)"
   },
   "prisma": {
+    "schema": "./prisma",
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.14.0"
+    "@prisma/client": "^6.7.0"
   },
   "devDependencies": {
-    "prisma": "^5.14.0",
+    "prisma": "^6.7.0",
     "tsx": "^4.19.0",
     "typescript": "^5.4.5",
     "@repo/tsconfig": "workspace:*",
