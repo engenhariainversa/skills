@@ -21,6 +21,8 @@ Colocar `app.exemplo.com` no ar exige **três coisas na Cloudflare**, todas auto
 
 Mais o nginx do proxy (`server_name` + `proxy_pass`), que é a skill `docker-nginx-cloudflare-proxy`.
 
+Se a máquina já tem o token de deploy em `<proxy>/cloudflare.env` (pré-requisitos da skill `docker-nginx-cloudflare-proxy`), prefira os scripts de lá para ingress e DNS: `cf-tunnel-add.sh` faz backup e confere os outros sites, e `cf-dns.sh` acha a zona pelo token e não apaga registro legado sem confirmação. Esta skill continua sendo o caminho sem esse token e para o Access.
+
 ## Credenciais e o que cada uma enxerga
 
 - **`~/.cloudflared/cert.pem`** — gerado por `cloudflared tunnel login`. Contém um `apiToken` **restrito à zona escolhida no browser durante o login** (mais o `accountID`). Serve para ingress (escopo de conta) e para `route dns` (escopo de zona).

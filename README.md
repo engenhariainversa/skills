@@ -5,9 +5,9 @@ Skills do [Claude Code](https://code.claude.com) que capturam, passo a passo, co
 | Skill | O que faz |
 |---|---|
 | [`nextjs-docker-bootstrap`](skills/nextjs-docker-bootstrap/SKILL.md) | Cria e roda um Next.js (App Router, TS, Tailwind, pnpm) **sem instalar Node na máquina**. Dockerfile multi-stage, compose com profiles `dev` (hot reload) e `prod` (standalone). |
-| [`docker-nginx-cloudflare-proxy`](skills/docker-nginx-cloudflare-proxy/SKILL.md) | Um nginx como proxy reverso por domínio e Cloudflare Tunnel na entrada, sem abrir portas no roteador. Criação do proxy e inclusão de novos apps. |
+| [`docker-nginx-cloudflare-proxy`](skills/docker-nginx-cloudflare-proxy/SKILL.md) | Um nginx como proxy reverso por domínio e Cloudflare Tunnel na entrada, sem abrir portas no roteador. Criação do proxy e inclusão de novos apps. **Pré-requisitos de Cloudflare** (token de deploy com escopo mínimo em `cloudflare.env`) e scripts por API: validação só leitura, ingress no túnel compartilhado com backup/diff/verificação dos outros sites e DNS que não apaga legado sem confirmação. |
 | [`cloudflare-tunnel-hostnames`](skills/cloudflare-tunnel-hostnames/SKILL.md) | Hostname novo num túnel existente **pela CLI**: login do `cloudflared` na zona certa, ingress, CNAME via `tunnel route dns`, Access com allowlist de e-mails e validação de fora. |
-| [`github-selfhosted-deploy`](skills/github-selfhosted-deploy/SKILL.md) | Push na `main` → runner self-hosted no servidor → `docker compose --profile prod up -d --build` → health check. Inclui registro do runner. |
+| [`github-selfhosted-deploy`](skills/github-selfhosted-deploy/SKILL.md) | Push na `main` → runner self-hosted no servidor → `docker compose --profile prod up -d --build` → health check. Pré-requisitos da máquina (segredos compartilhados como `smtp.env`, permissões do Claude Code) e registro do runner por script, com um único bloco de sudo para a pessoa. |
 | [`monorepo-setup`](skills/monorepo-setup/SKILL.md) | Monorepo pnpm workspaces + Turborepo (`apps/` + `packages/`): Next.js + NestJS GraphQL (code-first, **Subscriptions via WebSocket desde o dia 1**, guard único HTTP/WS) + Prisma compartilhados, client Apollo HTTP+WS em `@repo/graphql`, um Dockerfile multi-target, compose dev/prod e deploy com secrets. Inclui checklist para adicionar app/package. |
 | [`nextjs-server-action-form`](skills/nextjs-server-action-form/SKILL.md) | Formulário com Server Action + `useActionState`, validação por campo, honeypot, persistência em JSON e teste por `curl`. |
 | [`vector-db-pgvector`](skills/vector-db-pgvector/SKILL.md) | Busca por similaridade no próprio Postgres: imagem com pgvector (e variante com PostGIS), serviço de embeddings local (fastembed, CPU, 384 dim), Prisma com `Unsupported` + SQL cru, k-NN por cosseno, sweeper, calibração de limiar e dedup de conteúdo gerado por agente. |
@@ -47,7 +47,7 @@ Só para um projeto: os mesmos links em `.claude/skills/` dentro do repositório
 
 Opcionais: `vector-db-pgvector` quando o backend precisa de similaridade semântica (memória de agente, dedup); `react-native-mobile-app` quando há app nativo consumindo a API.
 
-Cada skill lista o que fica a cargo de quem opera (painel da Cloudflare, `sudo` para o runner) para o Claude não tentar contornar permissões.
+Antes do primeiro deploy numa máquina, cumpra os pré-requisitos das skills `docker-nginx-cloudflare-proxy` e `github-selfhosted-deploy` (token de deploy da Cloudflare, arquivos de segredos compartilhados, regras de permissão). Com eles, o agente faz o deploy inteiro; sobra para quem opera só o `sudo` do runner, trocar nameservers no registrador e aprovar a remoção de registros DNS legados.
 
 ## Estrutura
 

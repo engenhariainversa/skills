@@ -15,6 +15,24 @@ navegador -> Cloudflare (TLS) -> tunnel -> proxy-cloudflared -> proxy-nginx:80 -
 - Existe uma rede docker **externa** chamada `proxy`. Cada app entra nela e **não publica portas** no host. O nginx fala com o app pelo nome do container.
 - Um arquivo `nginx/conf.d/<dominio>.conf` por site, sempre `listen 80`: o TLS acontece na borda da Cloudflare. Isso resolve o caso comum de operadora que bloqueia 80/443 de entrada (CGNAT, ONT sem port forward).
 
+## Pré-requisitos (antes do primeiro deploy na máquina)
+
+Para o agente publicar um site do começo ao fim, sem a pessoa colar token nem mexer no painel, a máquina precisa de (detalhes e motivos em `references/prerequisites.md`):
+
+- [ ] Túnel remoto rodando no `proxy-cloudflared` (seção *Criar o proxy*).
+- [ ] **Token de deploy** com Account · Cloudflare Tunnel · Edit, Zone · DNS · Edit e Zone · Zone · Read. Token só de túnel não basta: o ingress entra e o hostname não resolve.
+- [ ] **`<proxy>/cloudflare.env`** (`chmod 600`, fora de repos) com `CF_ACCOUNT_ID`, `CF_API_TOKEN` e `CF_TUNNEL_ID`. Nunca procure token em `.env` de outro projeto nem abra este arquivo: os scripts leem sozinhos.
+- [ ] Domínio na Cloudflare (nameservers trocados no registrador). Só a pessoa faz.
+- [ ] Regras de permissão do Claude Code para `scripts/cf-*.sh`, ou a pessoa roda o `--apply` com `!`.
+
+Conferência, só leitura:
+
+```bash
+bash scripts/cf-check.sh <zona-do-site>
+```
+
+Se o arquivo não existe ou alguma linha sai `FALHA`, pare e mostre à pessoa o item do checklist que falta. Não improvise com outra credencial.
+
 ## Primeiro: descubra o que já existe
 
 ```bash
@@ -70,10 +88,21 @@ Um 200 aqui prova que nginx → app funciona, independente de DNS.
 
 ### 4. Domínio na Cloudflare
 
-1. A zona do domínio precisa estar na Cloudflare. Verifique com `dig +short NS <dominio>`: se aparecer `domaincontrol.com` (GoDaddy), `registro.br` etc., o usuário precisa adicionar o site na Cloudflare e trocar os nameservers no registrador. Um CNAME para `*.cfargotunnel.com` a partir de outro DNS **não** funciona.
-2. Hostname no ingress do túnel (→ `proxy-nginx:80`) e CNAME proxied na zona. Dá para fazer pela CLI com `cloudflared` — é a skill **`cloudflare-tunnel-hostnames`** (inclui login por zona, Access com allowlist e validação). Pelo painel: Zero Trust → Tunnels → o túnel → *Public Hostname* → `<dominio>` → tipo **HTTP** → URL `proxy-nginx:80`; a Cloudflare cria o registro DNS sozinha.
+1. A zona precisa estar na Cloudflare: `dig +short NS <dominio>` tem que mostrar `*.ns.cloudflare.com`. Se aparecer `domaincontrol.com` (GoDaddy), `registro.br` etc., a pessoa adiciona o site na Cloudflare e troca os nameservers no registrador. Um CNAME para `*.cfargotunnel.com` a partir de outro DNS **não** funciona.
+2. Ingress do túnel (compartilhado com todos os sites da máquina): primeiro o diff, depois `--apply`. O script faz backup, confere que nenhuma regra antiga mudou, relê a config e verifica que os outros sites continuam respondendo.
+   ```bash
+   bash scripts/cf-tunnel-add.sh <dominio> www.<dominio>
+   bash scripts/cf-tunnel-add.sh --apply <dominio> www.<dominio>
+   ```
+3. DNS: CNAME proxied para `<CF_TUNNEL_ID>.cfargotunnel.com`, na zona descoberta pelo próprio token.
+   ```bash
+   bash scripts/cf-dns.sh <dominio> www.<dominio>            # plano: ok / ajuste / legado / falta
+   bash scripts/cf-dns.sh --apply <dominio> www.<dominio>
+   ```
+   Registro `legado` (A de estacionamento, CNAME antigo do `www`) **só sai com confirmação da pessoa**: mostre a lista e, com o ok dela, rode `--apply --confirm-delete <id1>,<id2>`. MX/TXT nunca são tocados.
+4. De fora: `curl -s -o /dev/null -w '%{http_code}\n' https://<dominio>/` (`000` nos primeiros 30-60 s é propagação; `530` = hostname fora do ingress; `502` = nginx não alcança o container).
 
-Avise o usuário do passo 1 quando o DNS ainda não estiver na Cloudflare.
+Sem o `cloudflare.env`, a alternativa é a skill **`cloudflare-tunnel-hostnames`** (`cloudflared` com `cert.pem` por zona) ou o painel: Zero Trust → Tunnels → o túnel → *Public Hostname* → `<dominio>` → **HTTP** → `proxy-nginx:80`.
 
 ## Operação
 
